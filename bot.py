@@ -5,7 +5,7 @@ from discord.ext import commands
 
 BOT_TOKEN = os.getenv("BOT_TOKEN", "").strip()
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "AQ.Ab8RN6LZXud8_vOzu5LT3DEdGhkyfA2aJ7MRfZYMtfX7IqEcXw").strip()
-LEAD_IDS = [int(x.strip()) for x in os.getenv("ASSISTANT_USER_IDS", "").split(",") if x.strip().isdigit()]
+LEAD_IDS = [int(x.strip()) for x in os.getenv("ASSISTANT_USER_IDS", "1328042121181139007").split(",") if x.strip().isdigit()]
 STAFF_ROLE_IDS = [1567026563369664590]
 OFFICE_CATEGORY_ID = 1567026565483859991
 START_TIME, BOT_STATUS = time.time(), "Starting..."

@@ -4,8 +4,15 @@ import discord
 from discord.ext import commands
 
 BOT_TOKEN = os.getenv("BOT_TOKEN", "").strip()
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "AQ.Ab8RN6LZXud8_vOzu5LT3DEdGhkyfA2aJ7MRfZYMtfX7IqEcXw").strip()
-LEAD_IDS = [int(x.strip()) for x in os.getenv("ASSISTANT_USER_IDS", "1328042121181139007").split(",") if x.strip().isdigit()]
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "").strip()
+
+# Updated with your Assistant ID + any additional IDs from environment variables
+LEAD_IDS = [1567026565483859991]
+extra_ids = [int(x.strip()) for x in os.getenv("ASSISTANT_USER_IDS", "").split(",") if x.strip().isdigit()]
+for eid in extra_ids:
+    if eid not in LEAD_IDS:
+        LEAD_IDS.append(eid)
+
 STAFF_ROLE_IDS = [1567026563369664590]
 OFFICE_CATEGORY_ID = 1567026565483859991
 START_TIME, BOT_STATUS = time.time(), "Starting..."
@@ -166,4 +173,3 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-    

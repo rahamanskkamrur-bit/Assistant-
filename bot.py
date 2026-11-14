@@ -3,15 +3,13 @@ from aiohttp import web
 import discord
 from discord.ext import commands
 
-BOT_TOKEN = os.getenv("BOT_TOKEN", "").strip()
+BOT_TOKEN = os.getenv("BOT_TOKEN", "").strip().strip('"').strip("'")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "").strip()
 
-# Updated with your Assistant ID + any additional IDs from environment variables
 LEAD_IDS = [1567026565483859991]
-extra_ids = [int(x.strip()) for x in os.getenv("ASSISTANT_USER_IDS", "").split(",") if x.strip().isdigit()]
-for eid in extra_ids:
-    if eid not in LEAD_IDS:
-        LEAD_IDS.append(eid)
+for x in os.getenv("ASSISTANT_USER_IDS", "").split(","):
+    if x.strip().isdigit() and int(x.strip()) not in LEAD_IDS:
+        LEAD_IDS.append(int(x.strip()))
 
 STAFF_ROLE_IDS = [1567026563369664590]
 OFFICE_CATEGORY_ID = 1567026565483859991
@@ -26,7 +24,7 @@ def is_office_ch(ch) -> bool:
 
 async def run_web():
     app = web.Application()
-    app.router.add_get("/", lambda r: web.Response(text=f"Office of the Bot Lead 24/7 | Up: {int((time.time()-START_TIME)//60)}m | {BOT_STATUS}"))
+    app.router.add_get("/", lambda r: web.Response(text=f"Office of the Bot Lead 24/7 | Up: {int((time.time()-START_TIME)//60)}m | Status: {BOT_STATUS}"))
     runner = web.AppRunner(app); await runner.setup()
     try: await web.TCPSite(runner, "0.0.0.0", int(os.environ.get("PORT", 10000))).start()
     except Exception: pass
@@ -123,8 +121,10 @@ class OfficePanelView(discord.ui.View):
         await i.response.send_modal(IntakeModal())
 
 class OfficeBot(commands.Bot):
-    def __init__(self):
-        super().__init__(command_prefix="!", intents=discord.Intents.all(), help_command=None)
+    def __init__(self, msg_intent: bool = True):
+        intents = discord.Intents.default()
+        intents.message_content = msg_intent
+        super().__init__(command_prefix="!", intents=intents, help_command=None)
     async def setup_hook(self):
         self.add_view(OfficePanelView()); self.add_view(OfficeCtrlView()); await self.tree.sync()
     async def on_ready(self):
@@ -149,27 +149,40 @@ class OfficeBot(commands.Bot):
             if m.channel.id not in AI_PAUSED:
                 await send_blind(m.channel, "Executive AI", await ai_office_reply(m.content), m.author.id)
 
-bot = OfficeBot()
+def reg_cmds(b: OfficeBot):
+    @b.tree.command(name="officepanel", description="Post the Office of the Bot Lead blindfolded panel")
+    async def s_op(i: discord.Interaction):
+        if not is_auth(i.user): return await i.response.send_message("❌ Office personnel only.", ephemeral=True)
+        emb = discord.Embed(title="🏛️ Office of the Bot Lead — Executive Desk", description="🕶️ **Blindfolded Protocol:** Click below to contact the **Bot Lead & Executive Assistants**. All replies arrive under a unified Office identity.", color=discord.Color.from_rgb(47, 49, 54))
+        await i.response.send_message(embed=emb, view=OfficePanelView())
 
-@bot.tree.command(name="officepanel", description="Post the Office of the Bot Lead blindfolded panel")
-async def s_op(i: discord.Interaction):
-    if not is_auth(i.user): return await i.response.send_message("❌ Office personnel only.", ephemeral=True)
-    emb = discord.Embed(title="🏛️ Office of the Bot Lead — Executive Desk", description="🕶️ **Blindfolded Protocol:** Click below to contact the **Bot Lead & Executive Assistants**. All replies arrive under a unified Office identity.", color=discord.Color.from_rgb(47, 49, 54))
-    await i.response.send_message(embed=emb, view=OfficePanelView())
-
-@bot.tree.command(name="reply", description="Send a blindfolded reply as the Office of the Bot Lead")
-async def s_rep(i: discord.Interaction, message: str):
-    if not is_auth(i.user) or not is_office_ch(i.channel): return await i.response.send_message("❌ Use inside an Office channel.", ephemeral=True)
-    await i.response.defer(ephemeral=True); AI_PAUSED.add(i.channel.id)
-    rm = re.search(r"ReqID:(\d+)", i.channel.topic or "")
-    await send_blind(i.channel, f"Human ({i.user.display_name})", message, int(rm.group(1)) if rm else None)
-    await i.followup.send("🕶️ Sent anonymously!", ephemeral=True)
+    @b.tree.command(name="reply", description="Send a blindfolded reply as the Office of the Bot Lead")
+    async def s_rep(i: discord.Interaction, message: str):
+        if not is_auth(i.user) or not is_office_ch(i.channel): return await i.response.send_message("❌ Use inside an Office channel.", ephemeral=True)
+        await i.response.defer(ephemeral=True); AI_PAUSED.add(i.channel.id)
+        rm = re.search(r"ReqID:(\d+)", i.channel.topic or "")
+        await send_blind(i.channel, f"Human ({i.user.display_name})", message, int(rm.group(1)) if rm else None)
+        await i.followup.send("🕶️ Sent anonymously!", ephemeral=True)
 
 async def main():
+    global BOT_STATUS
     await run_web(); asyncio.create_task(pinger())
-    if BOT_TOKEN: await bot.start(BOT_TOKEN)
-    else:
+    if not BOT_TOKEN:
+        BOT_STATUS = "MISSING BOT_TOKEN IN RENDER ENVIRONMENT"
+        print("❌ ERROR: BOT_TOKEN is missing in Environment Variables!")
+        while True: await asyncio.sleep(3600)
+    bot = OfficeBot(True); reg_cmds(bot)
+    try:
+        await bot.start(BOT_TOKEN)
+    except discord.PrivilegedIntentsRequired:
+        await bot.close()
+        bot = OfficeBot(False); reg_cmds(bot)
+        await bot.start(BOT_TOKEN)
+    except Exception as e:
+        BOT_STATUS = f"ERROR: {type(e).__name__}: {e}"
+        print(f"❌ Login Error: {e}")
         while True: await asyncio.sleep(3600)
 
 if __name__ == "__main__":
     asyncio.run(main())
+    
